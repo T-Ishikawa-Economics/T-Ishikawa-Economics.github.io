@@ -1,0 +1,127 @@
+HTML
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>石川研究室 - Home</title>
+    <style>
+        /* 全体のリセットと基本設定 */
+        body {
+            margin: 0;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            display: flex;
+            min-height: 100vh;
+            color: #333;
+            background-color: #f9f9f9;
+        }
+
+        /* サイドバーのデザイン */
+        .sidebar {
+            width: 250px;
+            background-color: #2c3e50; /* 落ち着いたネイビー */
+            color: #ecf0f1;
+            padding: 30px 20px;
+            box-sizing: border-box;
+            position: fixed; /* サイドバーを固定 */
+            height: 100vh;
+        }
+
+        .sidebar h2 {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            text-align: center;
+            border-bottom: 1px solid #34495e;
+            padding-bottom: 15px;
+        }
+
+        .sidebar a {
+            display: block;
+            color: #ecf0f1;
+            text-decoration: none;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        .sidebar a:hover {
+            background-color: #34495e;
+        }
+
+        /* 現在いるページを強調するクラス */
+        .sidebar a.active {
+            background-color: #3498db; /* アクセントカラーの青 */
+            font-weight: bold;
+        }
+
+        /* メインコンテンツのデザイン */
+        .main-content {
+            margin-left: 250px; /* サイドバーの幅だけ余白を空ける */
+            padding: 50px;
+            flex: 1;
+            background-color: #ffffff;
+            box-sizing: border-box;
+        }
+
+        .main-content h1 {
+            font-size: 2rem;
+            border-bottom: 2px solid #2c3e50;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            color: #2c3e50;
+        }
+
+        .main-content h2 {
+            font-size: 1.4rem;
+            margin-top: 40px;
+            color: #2c3e50;
+        }
+
+        .main-content p {
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .profile-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- サイドバー -->
+    <div class="sidebar">
+        <h2>Menu</h2>
+        <a href="index.html" class="active">Home</a>
+        <a href="database.html">データベース</a>
+        <a href="materials.html">授業資料</a>
+        <a href="cv.html">CV</a>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div class="main-content">
+        <h1>石川研究室</h1>
+        
+        <p>神奈川大学 経営学部 石川貴幸の研究室ページへようこそ。</p>
+
+        <div class="profile-section">
+            <h2>プロフィール</h2>
+            <p><strong>石川 貴幸 (Takayuki Ishikawa)</strong></p>
+            <p>神奈川大学 経営学部 助教</p>
+            <p>専門はマクロ経済学、企業の設備投資分析、無形資産</p>
+        </div>
+
+        <h2>News & Updates</h2>
+        <ul>
+            <li><strong>2026.05.24:</strong> 研究室のWebサイトをGitHub Pagesに移転し、リニューアルしました。</li>
+            <li><strong>2026.04.xx:</strong> 新年度のゼミナール（授業資料）の情報を更新しました。</li>
+        </ul>
+    </div>
+
+</body>
+</html>
