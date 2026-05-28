@@ -94,7 +94,6 @@
 
         loadingDiv.style.display = 'block';
 
-        // 1. まず data.csv を読み込む
         Papa.parse(dataCsvUrl, {
             download: true,
             header: true,
@@ -103,7 +102,6 @@
             complete: function(dataResults) {
                 globalData = dataResults.data;
                 
-                // 2. 次に supply.csv を読み込む
                 Papa.parse(supplyCsvUrl, {
                     download: true,
                     header: true,
@@ -118,20 +116,19 @@
                             return;
                         }
 
-                        // --- 【修正】見えない文字（BOM）対策 ---
-                        // 名前で探さず、無条件で「1列目」を「年」として取得します
+                        // --- データの準備 ---
                         const yearKeyData = Object.keys(globalData[0])[0]; 
                         const yearKeySupply = Object.keys(supplyData[0])[0];
 
                         years = globalData.map(row => row[yearKeyData]);
                         supplyYears = supplyData.map(row => row[yearKeySupply]);
                         
-                        // 1列目以外のすべての列名をヘッダーとして取得
                         const headers = Object.keys(globalData[0]).filter(h => h !== yearKeyData);
-
                         const prodVars = headers.filter(h => h.includes('産出額') || h.includes('付加価値') || h.includes('中間投入'));
-                        const supplyCategories = ["病院", "診療所", "卸売業者", "小売業者", "賃貸業者", "その他"]; 
                         const capVars = headers.filter(h => h.includes('建物') || h.includes('構築物') || h.includes('機械') || h.includes('ソフトウェア') || h.includes('研究開発'));
+
+                        // 【究極の対策】supply.csvの1列目（年）以外のすべての列名を、そのまま円グラフの項目として取得
+                        const supplyCategories = Object.keys(supplyData[0]).filter(k => k !== yearKeySupply);
 
                         // --- 1. 生産データのグラフ描画 ---
                         prodVars.forEach(v => {
@@ -174,7 +171,6 @@
 
                         // --- 3. 供給先データのグラフ描画 ---
                         supplyYears.forEach((y, index) => {
-                            // 空データを除外してプルダウンに追加
                             if (y !== null && y !== undefined && y !== "") {
                                 selSupply.add(new Option(y + "年", index)); 
                             }
@@ -183,11 +179,16 @@
                         function updateSupplyChart() {
                             const rowIndex = parseInt(selSupply.value);
                             const rowData = supplyData[rowIndex]; 
+                            
+                            // CSVにある列名（supplyCategories）を使って値を抽出
                             const values = supplyCategories.map(cat => rowData[cat] || 0); 
+                            
+                            // 画面表示用に、見えないスペースや改行コードを削除して綺麗にする
+                            const displayLabels = supplyCategories.map(cat => cat.trim());
 
                             const trace = [{
                                 values: values,
-                                labels: supplyCategories,
+                                labels: displayLabels,
                                 type: 'pie',
                                 hole: 0.4,
                                 hovertemplate: '%{label}: %{value:,.0f} 百万円<br>%{percent}<extra></extra>' 
@@ -199,7 +200,7 @@
                             selSupply.addEventListener('change', updateSupplyChart);
                             updateSupplyChart();
                         } else {
-                            document.getElementById('chart-supply').innerHTML = "<p style='color:red;'>年号データが見つからないため表示できません。</p>";
+                            document.getElementById('chart-supply').innerHTML = "<p style='color:red;'>データが見つからないため表示できません。</p>";
                         }
 
                         // --- 4. 資本データのグラフ描画 ---
