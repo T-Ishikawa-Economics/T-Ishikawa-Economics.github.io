@@ -78,7 +78,6 @@
     </div>
 
     <script>
-        // 2つのCSVファイルのURLを指定
         const dataCsvUrl = 'data.csv'; 
         const supplyCsvUrl = 'supply.csv';
         
@@ -87,7 +86,6 @@
         let years = [];
         let supplyYears = [];
 
-        // UI要素の取得
         const selProd1 = document.getElementById('prod-var1');
         const selProd2 = document.getElementById('prod-var2');
         const selSupply = document.getElementById('supply-year');
@@ -105,7 +103,7 @@
             complete: function(dataResults) {
                 globalData = dataResults.data;
                 
-                // 2. 次に supply.csv を読み込む（入れ子構造）
+                // 2. 次に supply.csv を読み込む
                 Papa.parse(supplyCsvUrl, {
                     download: true,
                     header: true,
@@ -116,19 +114,22 @@
                         loadingDiv.style.display = 'none';
                         
                         if(globalData.length === 0 || supplyData.length === 0) {
-                            alert("データの読み込みに失敗しました。ファイルが正しくアップロードされているか確認してください。");
+                            alert("データの読み込みに失敗しました。");
                             return;
                         }
 
-                        // --- データの準備 ---
-                        // "year"（小文字）でも対応できるように修正
-                        years = globalData.map(row => row['year'] || row['Year'] || row['年']);
-                        supplyYears = supplyData.map(row => row['year'] || row['Year'] || row['年']);
+                        // --- 【修正】見えない文字（BOM）対策 ---
+                        // 名前で探さず、無条件で「1列目」を「年」として取得します
+                        const yearKeyData = Object.keys(globalData[0])[0]; 
+                        const yearKeySupply = Object.keys(supplyData[0])[0];
+
+                        years = globalData.map(row => row[yearKeyData]);
+                        supplyYears = supplyData.map(row => row[yearKeySupply]);
                         
-                        const headers = Object.keys(globalData[0]).filter(h => h !== 'year' && h !== 'Year' && h !== '年');
+                        // 1列目以外のすべての列名をヘッダーとして取得
+                        const headers = Object.keys(globalData[0]).filter(h => h !== yearKeyData);
 
                         const prodVars = headers.filter(h => h.includes('産出額') || h.includes('付加価値') || h.includes('中間投入'));
-                        // CSVの実際の列名「卸売業者」「小売業者」に修正
                         const supplyCategories = ["病院", "診療所", "卸売業者", "小売業者", "賃貸業者", "その他"]; 
                         const capVars = headers.filter(h => h.includes('建物') || h.includes('構築物') || h.includes('機械') || h.includes('ソフトウェア') || h.includes('研究開発'));
 
@@ -171,14 +172,17 @@
                             });
                         }
 
-                        // --- 3. 供給先データのグラフ描画 (supplyDataを使用) ---
+                        // --- 3. 供給先データのグラフ描画 ---
                         supplyYears.forEach((y, index) => {
-                            if (y) selSupply.add(new Option(y + "年", index)); 
+                            // 空データを除外してプルダウンに追加
+                            if (y !== null && y !== undefined && y !== "") {
+                                selSupply.add(new Option(y + "年", index)); 
+                            }
                         });
 
                         function updateSupplyChart() {
                             const rowIndex = parseInt(selSupply.value);
-                            const rowData = supplyData[rowIndex]; // supplyDataから取得するように修正
+                            const rowData = supplyData[rowIndex]; 
                             const values = supplyCategories.map(cat => rowData[cat] || 0); 
 
                             const trace = [{
@@ -190,9 +194,12 @@
                             }];
                             Plotly.newPlot('chart-supply', trace, { margin: { t: 20 } });
                         }
+                        
                         if(selSupply.options.length > 0) {
                             selSupply.addEventListener('change', updateSupplyChart);
                             updateSupplyChart();
+                        } else {
+                            document.getElementById('chart-supply').innerHTML = "<p style='color:red;'>年号データが見つからないため表示できません。</p>";
                         }
 
                         // --- 4. 資本データのグラフ描画 ---
