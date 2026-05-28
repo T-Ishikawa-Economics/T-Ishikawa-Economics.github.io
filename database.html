@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>データベース - 経済・産業ダッシュボード</title>
+    <title>データベース - 医療機器製造産業ダッシュボード</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
@@ -36,7 +36,7 @@
     </div>
 
     <div class="main-content">
-        <h1>産業・経済データ ダッシュボード</h1>
+        <h1>医療機器製造産業データ ダッシュボード</h1>
         <div id="loading">データを読み込んでいます...</div>
         <p>各グラフのドロップダウンメニューから変数を選択すると、インタラクティブにグラフが更新されます。</p>
 
@@ -125,7 +125,30 @@
                         
                         const headers = Object.keys(globalData[0]).filter(h => h !== yearKeyData);
                         const prodVars = headers.filter(h => h.includes('産出額') || h.includes('付加価値') || h.includes('中間投入'));
-                        const capVars = headers.filter(h => h.includes('建物') || h.includes('構築物') || h.includes('機械') || h.includes('ソフトウェア') || h.includes('研究開発'));
+                       // 【変更点1】合計も含めるように条件を変更
+                        const capVars = headers.filter(h => h.includes('投資') || h.includes('資本ストック') || h.includes('資本サービス'));
+
+                        // 【変更点2】元の列名を「見やすいラベル」に変換する関数
+                        function formatCapLabel(header) {
+                            let prefix = "";
+                            let metric = "";
+                            let asset = "";
+
+                            if (header.includes('名目')) prefix = "名目_";
+                            if (header.includes('実質')) prefix = "実質_";
+
+                            if (header.includes('投資')) metric = "投資_";
+                            if (header.includes('資本ストック')) metric = "資本ストック_";
+                            if (header.includes('資本サービス')) metric = "資本サービス_";
+
+                            if (header.includes('合計')) {
+                                asset = "合計";
+                            } else {
+                                asset = header.replace('名目', '').replace('実質', '')
+                                              .replace('投資額', '').replace('資本ストック額', '').replace('資本サービス額', '');
+                            }
+                            return prefix + metric + asset;
+                        }
 
                         // 【究極の対策】supply.csvの1列目（年）以外のすべての列名を、そのまま円グラフの項目として取得
                         const supplyCategories = Object.keys(supplyData[0]).filter(k => k !== yearKeySupply);
@@ -205,14 +228,20 @@
 
                         // --- 4. 資本データのグラフ描画 ---
                         capVars.forEach(v => {
-                            capSels.forEach(sel => sel.add(new Option(v, v)));
+                            const displayLabel = formatCapLabel(v);
+                            // Option(画面に表示する文字, 裏で持っておくCSVの列名)
+                            capSels.forEach(sel => sel.add(new Option(displayLabel, v))); 
                         });
                         if(capVars.length > 1) capSels[1].selectedIndex = 1;
 
                         function updateCapChart() {
                             const selected = capSels.map(sel => sel.value).filter(v => v !== "none");
                             const traces = selected.map(v => ({
-                                x: years, y: globalData.map(r => r[v]), type: 'scatter', mode: 'lines', name: v
+                                x: years, 
+                                y: globalData.map(r => r[v]), 
+                                type: 'scatter', 
+                                mode: 'lines', 
+                                name: formatCapLabel(v) // グラフの凡例も見やすいラベルにする
                             }));
                             Plotly.newPlot('chart-capital', traces, { 
                                 margin: { t: 20 }, 
