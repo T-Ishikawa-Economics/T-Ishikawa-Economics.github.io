@@ -40,7 +40,7 @@
         <div id="loading">データを読み込んでいます...</div>
         <p>各グラフのドロップダウンメニューから変数を選択すると、インタラクティブにグラフが更新されます。</p>
 
-<div class="dashboard-card">
+        <div class="dashboard-card">
             <h2>1. 生産に関するデータ (単位: 百万円)</h2>
             <div class="controls">
                 <label>変数1: <select id="prod-var1"></select></label>
@@ -78,11 +78,14 @@
     </div>
 
     <script>
-        // CSVファイルのURL
-        const csvUrl = 'data.csv'; 
+        // 2つのCSVファイルのURLを指定
+        const dataCsvUrl = 'data.csv'; 
+        const supplyCsvUrl = 'supply.csv';
         
         let globalData = []; 
+        let supplyData = [];
         let years = [];
+        let supplyYears = [];
 
         // UI要素の取得
         const selProd1 = document.getElementById('prod-var1');
@@ -91,112 +94,128 @@
         const capSels = [document.getElementById('cap-var1'), document.getElementById('cap-var2'), document.getElementById('cap-var3'), document.getElementById('cap-var4')];
         const loadingDiv = document.getElementById('loading');
 
-        // CSV読み込み処理
         loadingDiv.style.display = 'block';
-        Papa.parse(csvUrl, {
+
+        // 1. まず data.csv を読み込む
+        Papa.parse(dataCsvUrl, {
             download: true,
             header: true,
             dynamicTyping: true, 
             skipEmptyLines: true,
-            complete: function(results) {
-                globalData = results.data;
-                loadingDiv.style.display = 'none';
+            complete: function(dataResults) {
+                globalData = dataResults.data;
                 
-                if(globalData.length === 0) {
-                    alert("データの読み込みに失敗しました。data.csvが正しくアップロードされているか確認してください。");
-                    return;
-                }
+                // 2. 次に supply.csv を読み込む（入れ子構造）
+                Papa.parse(supplyCsvUrl, {
+                    download: true,
+                    header: true,
+                    dynamicTyping: true, 
+                    skipEmptyLines: true,
+                    complete: function(supplyResults) {
+                        supplyData = supplyResults.data;
+                        loadingDiv.style.display = 'none';
+                        
+                        if(globalData.length === 0 || supplyData.length === 0) {
+                            alert("データの読み込みに失敗しました。ファイルが正しくアップロードされているか確認してください。");
+                            return;
+                        }
 
-                years = globalData.map(row => row['年'] || row['Year']);
-                const headers = Object.keys(globalData[0]).filter(h => h !== '年' && h !== 'Year');
+                        // --- データの準備 ---
+                        // "year"（小文字）でも対応できるように修正
+                        years = globalData.map(row => row['year'] || row['Year'] || row['年']);
+                        supplyYears = supplyData.map(row => row['year'] || row['Year'] || row['年']);
+                        
+                        const headers = Object.keys(globalData[0]).filter(h => h !== 'year' && h !== 'Year' && h !== '年');
 
-                const prodVars = headers.filter(h => h.includes('産出額') || h.includes('付加価値') || h.includes('中間投入'));
-                const supplyCategories = ["病院", "診療所", "卸売り", "小売り", "賃貸業者", "その他"]; 
-                const capVars = headers.filter(h => h.includes('建物') || h.includes('構築物') || h.includes('機械') || h.includes('ソフトウェア') || h.includes('研究開発'));
+                        const prodVars = headers.filter(h => h.includes('産出額') || h.includes('付加価値') || h.includes('中間投入'));
+                        // CSVの実際の列名「卸売業者」「小売業者」に修正
+                        const supplyCategories = ["病院", "診療所", "卸売業者", "小売業者", "賃貸業者", "その他"]; 
+                        const capVars = headers.filter(h => h.includes('建物') || h.includes('構築物') || h.includes('機械') || h.includes('ソフトウェア') || h.includes('研究開発'));
 
-                // --- 1. 生産データのグラフ描画 ---
-                prodVars.forEach(v => {
-                    selProd1.add(new Option(v, v));
-                    selProd2.add(new Option(v, v));
+                        // --- 1. 生産データのグラフ描画 ---
+                        prodVars.forEach(v => {
+                            selProd1.add(new Option(v, v));
+                            selProd2.add(new Option(v, v));
+                        });
+                        if(prodVars.length > 1) selProd2.selectedIndex = 1;
+
+                        function updateProdChart() {
+                            const v1 = selProd1.value;
+                            const v2 = selProd2.value;
+                            const trace1 = { x: years, y: globalData.map(r => r[v1]), type: 'scatter', mode: 'lines+markers', name: v1 };
+                            const trace2 = { x: years, y: globalData.map(r => r[v2]), type: 'scatter', mode: 'lines+markers', name: v2 };
+                            Plotly.newPlot('chart-production', [trace1, trace2], { 
+                                margin: { t: 20 }, 
+                                legend: { orientation: 'h', y: -0.2 },
+                                yaxis: { title: '金額 (百万円)' } 
+                            });
+                        }
+                        selProd1.addEventListener('change', updateProdChart);
+                        selProd2.addEventListener('change', updateProdChart);
+                        if(prodVars.length > 0) updateProdChart();
+
+                        // --- 2. 労働データのグラフ描画 ---
+                        const wageCol = headers.find(h => h.includes('名目雇用者報酬'));
+                        const hoursCol = headers.find(h => h.includes('総労働時間'));
+                        const vaCol = headers.find(h => h.includes('名目付加価値額'));
+
+                        if(wageCol && hoursCol && vaCol) {
+                            const wagePerHour = globalData.map(r => r[wageCol] / r[hoursCol]);
+                            const vaPerHour = globalData.map(r => r[vaCol] / r[hoursCol]);
+                            const traceLabor1 = { x: years, y: wagePerHour, type: 'scatter', mode: 'lines', name: '1時間当たり名目雇用者報酬' };
+                            const traceLabor2 = { x: years, y: vaPerHour, type: 'scatter', mode: 'lines', name: '1時間当たり名目付加価値額' };
+                            Plotly.newPlot('chart-labor', [traceLabor1, traceLabor2], { 
+                                margin: { t: 20 }, 
+                                legend: { orientation: 'h', y: -0.2 },
+                                yaxis: { title: '金額 (百万円 / 時間)' }
+                            });
+                        }
+
+                        // --- 3. 供給先データのグラフ描画 (supplyDataを使用) ---
+                        supplyYears.forEach((y, index) => {
+                            if (y) selSupply.add(new Option(y + "年", index)); 
+                        });
+
+                        function updateSupplyChart() {
+                            const rowIndex = parseInt(selSupply.value);
+                            const rowData = supplyData[rowIndex]; // supplyDataから取得するように修正
+                            const values = supplyCategories.map(cat => rowData[cat] || 0); 
+
+                            const trace = [{
+                                values: values,
+                                labels: supplyCategories,
+                                type: 'pie',
+                                hole: 0.4,
+                                hovertemplate: '%{label}: %{value:,.0f} 百万円<br>%{percent}<extra></extra>' 
+                            }];
+                            Plotly.newPlot('chart-supply', trace, { margin: { t: 20 } });
+                        }
+                        if(selSupply.options.length > 0) {
+                            selSupply.addEventListener('change', updateSupplyChart);
+                            updateSupplyChart();
+                        }
+
+                        // --- 4. 資本データのグラフ描画 ---
+                        capVars.forEach(v => {
+                            capSels.forEach(sel => sel.add(new Option(v, v)));
+                        });
+                        if(capVars.length > 1) capSels[1].selectedIndex = 1;
+
+                        function updateCapChart() {
+                            const selected = capSels.map(sel => sel.value).filter(v => v !== "none");
+                            const traces = selected.map(v => ({
+                                x: years, y: globalData.map(r => r[v]), type: 'scatter', mode: 'lines', name: v
+                            }));
+                            Plotly.newPlot('chart-capital', traces, { 
+                                margin: { t: 20 }, 
+                                legend: { orientation: 'h', y: -0.2 },
+                                yaxis: { title: '金額 (百万円)' } 
+                            });
+                        }
+                        capSels.forEach(sel => sel.addEventListener('change', updateCapChart));
+                        if(capVars.length > 0) updateCapChart();
+                    }
                 });
-                if(prodVars.length > 1) selProd2.selectedIndex = 1;
-
-                function updateProdChart() {
-                    const v1 = selProd1.value;
-                    const v2 = selProd2.value;
-                    const trace1 = { x: years, y: globalData.map(r => r[v1]), type: 'scatter', mode: 'lines+markers', name: v1 };
-                    const trace2 = { x: years, y: globalData.map(r => r[v2]), type: 'scatter', mode: 'lines+markers', name: v2 };
-                    Plotly.newPlot('chart-production', [trace1, trace2], { 
-                        margin: { t: 20 }, 
-                        legend: { orientation: 'h', y: -0.2 },
-                        yaxis: { title: '金額 (百万円)' } // Y軸の単位を追加
-                    });
-                }
-                selProd1.addEventListener('change', updateProdChart);
-                selProd2.addEventListener('change', updateProdChart);
-                if(prodVars.length > 0) updateProdChart();
-
-                // --- 2. 労働データのグラフ描画 ---
-                const wageCol = headers.find(h => h.includes('名目雇用者報酬'));
-                const hoursCol = headers.find(h => h.includes('総労働時間'));
-                const vaCol = headers.find(h => h.includes('名目付加価値額'));
-
-                if(wageCol && hoursCol && vaCol) {
-                    const wagePerHour = globalData.map(r => r[wageCol] / r[hoursCol]);
-                    const vaPerHour = globalData.map(r => r[vaCol] / r[hoursCol]);
-                    const traceLabor1 = { x: years, y: wagePerHour, type: 'scatter', mode: 'lines', name: '1時間当たり名目雇用者報酬' };
-                    const traceLabor2 = { x: years, y: vaPerHour, type: 'scatter', mode: 'lines', name: '1時間当たり名目付加価値額' };
-                    Plotly.newPlot('chart-labor', [traceLabor1, traceLabor2], { 
-                        margin: { t: 20 }, 
-                        legend: { orientation: 'h', y: -0.2 },
-                        yaxis: { title: '金額 (百万円 / 時間)' } // Y軸の単位を追加
-                    });
-                }
-
-                // --- 3. 供給先データのグラフ描画 ---
-                years.forEach((y, index) => {
-                    if (y >= 1994) selSupply.add(new Option(y + "年", index)); 
-                });
-
-                function updateSupplyChart() {
-                    const rowIndex = parseInt(selSupply.value);
-                    const rowData = globalData[rowIndex];
-                    const values = supplyCategories.map(cat => rowData[cat] || 0); 
-
-                    const trace = [{
-                        values: values,
-                        labels: supplyCategories,
-                        type: 'pie',
-                        hole: 0.4,
-                        // マウスホバー時に「カンマ区切りの数値 + 百万円」を表示
-                        hovertemplate: '%{label}: %{value:,.0f} 百万円<br>%{percent}<extra></extra>' 
-                    }];
-                    Plotly.newPlot('chart-supply', trace, { margin: { t: 20 } });
-                }
-                if(selSupply.options.length > 0) {
-                    selSupply.addEventListener('change', updateSupplyChart);
-                    updateSupplyChart();
-                }
-
-                // --- 4. 資本データのグラフ描画 ---
-                capVars.forEach(v => {
-                    capSels.forEach(sel => sel.add(new Option(v, v)));
-                });
-                if(capVars.length > 1) capSels[1].selectedIndex = 1;
-
-                function updateCapChart() {
-                    const selected = capSels.map(sel => sel.value).filter(v => v !== "none");
-                    const traces = selected.map(v => ({
-                        x: years, y: globalData.map(r => r[v]), type: 'scatter', mode: 'lines', name: v
-                    }));
-                    Plotly.newPlot('chart-capital', traces, { 
-                        margin: { t: 20 }, 
-                        legend: { orientation: 'h', y: -0.2 },
-                        yaxis: { title: '金額 (百万円)' } // Y軸の単位を追加
-                    });
-                }
-                capSels.forEach(sel => sel.addEventListener('change', updateCapChart));
-                if(capVars.length > 0) updateCapChart();
             }
         });
     </script>
